@@ -1,0 +1,16 @@
+[Unit]
+Description=Pre-Reboot syncbootpart
+# DefaultDependencies=no
+# Before=reboot.target shutdown.target halt.target poweroff.target
+# After=local-fs.target
+RequiresMountsFor=/boot /boot/efi
+
+[Service]
+Type=oneshot
+ExecStart=/bin/true
+RemainAfterExit=true
+ExecStop=/usr/bin/syncbootpart
+
+[Install]
+WantedBy=multi-user.target
+# WantedBy=reboot.target shutdown.target halt.target poweroff.target
