@@ -106,10 +106,52 @@ for MNT in "/boot" "/boot/efi"; do
     fi
 
     if [[ "$MATCHED_PART" -ne 0 ]]; then
-        echo -n " ${ANSI_YELLOW}$PART_DST${ANSI_RESET}"
-        echo
-        if [[ "$DRY_RUN" -eq 0 ]]; then
-            dd if=$PART_SRC of=$PART_DST bs=1M |& sed -e 's/^/ /'
+        if [[ "$MNT" == "/boot" ]]; then
+            if [[ ! ( -d /boot/efi
+                && -d /boot/grub
+                && -f /boot/grub/grub.cfg
+                && -f /boot/vmlinuz
+                && -f /boot/initrd.img ) ]]; then
+                    echo " ${ANSI_RED} failed sanity check - skipping${ANSI_RESET}"
+                    continue
+            fi
+            mkdir -p /boot2
+            mount -o ro $PART_DST /boot2
+            rsync -anx --checksum --info=NAME --exclude=efi /boot/ /boot2/ --delete > /tmp/boot.diffs
+            echo -n " ${ANSI_YELLOW}$PART_DST${ANSI_RESET}"
+            if [ -s /tmp/boot.diffs ]; then
+                echo " ${ANSI_RED}updating${ANSI_RESET}"
+                if [[ "$DRY_RUN" -eq 0 ]]; then
+                    mount -o remount,rw $PART_DST /boot2
+                    rsync -ax --info=NAME --exclude=efi /boot/ /boot2/ --delete
+                else
+                    cat /tmp/boot.diffs
+                fi
+            else
+                echo " ${ANSI_GREEN}match${ANSI_RESET}"
+            fi
+            umount /boot2
+	    if [ -d /.boot.bkp ]; then
+		echo "${ANSI_YELLOW}rsync to /.boot.bkp${ANSI_RESET}"
+		if [[ "$DRY_RUN" -eq 0 ]]; then
+	            rsync -a /boot /.boot.bkp
+		fi
+            fi
+        fi
+        if [[ "$MNT" == "/boot/efi" ]]; then
+            echo -n " ${ANSI_YELLOW}$PART_DST${ANSI_RESET}"
+            # byte 66 is just whether dos fs is mounted
+            cmp -i 66 -s $PART_SRC $PART_DST
+            DIFFER=$?
+            if [[ "$DIFFER" -eq 0 ]]; then
+                echo -n " ${ANSI_GREEN}match${ANSI_RESET}"
+            else
+                echo -n " ${ANSI_RED}updating${ANSI_RESET}"
+            fi
+            echo
+            if [[ "$DIFFER" -ne 0 && "$DRY_RUN" -eq 0 ]]; then
+                dd if=$PART_SRC of=$PART_DST bs=1M |& sed -e 's/^/ /'
+            fi
         fi
         PROCESSED=$((PROCESSED+1))
     else
