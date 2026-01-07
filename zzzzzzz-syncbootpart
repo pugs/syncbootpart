@@ -1,0 +1,3 @@
+#!/bin/sh
+/opt/syncbootpart/bin/syncbootpart
+exit 0
